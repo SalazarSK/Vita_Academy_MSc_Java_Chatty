@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, Fragment } from "react";
+import { useEffect, useMemo, useState, Fragment, useRef } from "react";
 import {
   Box,
   Paper,
@@ -11,33 +11,138 @@ import {
   TextField,
   Button,
 } from "@mui/material";
-import { getUsers, getMessages, sendMessage } from "../api/api";
+import { getUsers, getMessages, sendMessage, logout } from "../api/api";
+import { connectWebSocket, disconnectWebSocket } from "../wsClient";
 
 export default function Chat({ user, onLogout }) {
+  const messagesContainerRef = useRef(null);
   const [users, setUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
+  const [stompClient, setStompClient] = useState(null);
 
   const handleLogout = async () => {
-    {
+    try {
+      await logout(user.id);
+      onLogout(null);
+    } catch (e) {
+      console.error("Logout failed", e);
+    } finally {
       onLogout(null);
     }
   };
 
   useEffect(() => {
-    (async () => {
+    if (!user) return;
+
+    const loadUsers = async () => {
       try {
         const data = await getUsers();
-        setUsers(data);
-        if (data.length > 0) {
-          setSelectedUser(data[0]);
+        const others = data.filter(
+          (u) =>
+            String(u.id) !== String(user.id) &&
+            String(u.uid) !== String(user.id)
+        );
+
+        setUsers(others);
+        if (!selectedUser && others.length > 0) {
+          setSelectedUser(others[0]);
         }
       } catch (e) {
         console.error("Failed to load users", e);
       }
-    })();
-  }, []);
+    };
+
+    loadUsers();
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const refresh = async () => {
+      try {
+        const data = await getUsers();
+        const others = data.filter(
+          (u) =>
+            String(u.id) !== String(user.id) &&
+            String(u.uid) !== String(user.id)
+        );
+        setUsers(others);
+      } catch (e) {
+        console.error("Failed to refresh users", e);
+      }
+    };
+
+    const interval = setInterval(refresh, 5000);
+    return () => clearInterval(interval);
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const client = connectWebSocket((stomp) => {
+      setStompClient(stomp);
+
+      stomp.publish({
+        destination: "/app/presence.update",
+        body: JSON.stringify({ userId: user.id, online: true }),
+      });
+
+      stomp.subscribe("/topic/user-status", (msg) => {
+        const status = JSON.parse(msg.body); // { userId, online }
+
+        setUsers((prev) =>
+          prev.map((u) =>
+            String(u.uid) === String(status.userId) ||
+            String(u.id) === String(status.userId)
+              ? { ...u, online: status.online }
+              : u
+          )
+        );
+      });
+    });
+
+    const handleBeforeUnload = () => {
+      try {
+        client.publish({
+          destination: "/app/presence.update",
+          body: JSON.stringify({ userId: user.id, online: false }),
+        });
+      } catch (_) {}
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      try {
+        client.publish({
+          destination: "/app/presence.update",
+          body: JSON.stringify({ userId: user.id, online: false }),
+        });
+      } catch (_) {}
+      disconnectWebSocket(client);
+    };
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!stompClient || !user || !selectedUser) return;
+
+    const convId = getConversationId(user.id, selectedUser.uid);
+
+    const subscription = stompClient.subscribe(
+      `/topic/conversation/${convId}`,
+      (msg) => {
+        const message = JSON.parse(msg.body);
+        setMessages((prev) => [...prev, message]);
+      }
+    );
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [stompClient, user?.id, selectedUser?.uid]);
 
   useEffect(() => {
     if (!user || !selectedUser) return;
@@ -68,19 +173,34 @@ export default function Chat({ user, onLogout }) {
   const handleSend = async () => {
     if (!text.trim() || !selectedUser) return;
 
+    const payload = {
+      fromUserId: user.id,
+      toUserId: selectedUser.uid,
+      content: text.trim(),
+    };
+
     try {
-      await sendMessage({
-        fromUserId: user.id,
-        toUserId: selectedUser.uid,
-        content: text.trim(),
-      });
       setText("");
 
-      const data = await getMessages(user.id, selectedUser.uid);
-      setMessages(data || []);
+      if (stompClient) {
+        stompClient.publish({
+          destination: "/app/chat.send",
+          body: JSON.stringify(payload),
+        });
+      } else {
+        await sendMessage(payload);
+        const data = await getMessages(user.id, selectedUser.uid);
+        setMessages(data || []);
+      }
     } catch (e) {
       console.error("Failed to send message", e);
     }
+  };
+
+  const getConversationId = (a, b) => {
+    const aa = String(a);
+    const bb = String(b);
+    return aa < bb ? `${aa}_${bb}` : `${bb}_${aa}`;
   };
 
   const sortedMessages = useMemo(() => {
@@ -107,6 +227,13 @@ export default function Chat({ user, onLogout }) {
       minute: "2-digit",
     });
   };
+
+  useEffect(() => {
+    if (!messagesContainerRef.current) return;
+    const el = messagesContainerRef.current;
+
+    el.scrollTop = el.scrollHeight;
+  }, [sortedMessages.length, selectedUser?.uid]);
 
   return (
     <Box
@@ -169,7 +296,6 @@ export default function Chat({ user, onLogout }) {
                   spacing={1.5}
                   sx={{ width: "100%" }}
                 >
-                  {/* zelená bodka online/offline */}
                   <Box
                     sx={{
                       width: 10,
@@ -213,6 +339,7 @@ export default function Chat({ user, onLogout }) {
 
           {/* Messages */}
           <Box
+            ref={messagesContainerRef}
             sx={{
               flex: 1,
               p: 3,

@@ -13,6 +13,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -51,6 +52,7 @@ public class UserService {
         if (!passwordEncoder.matches(request.password(), user.getPassword())) {
             throw new RuntimeException("Invalid credentials");
         }
+        touch(user.getId());
 
         return new LoginResponse(
                 user.getId(),
@@ -70,5 +72,19 @@ public class UserService {
     public User getById(String id) {
         return userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("User not found"));
+    }
+
+    public void logout(String userId) {
+        userRepository.findById(userId).ifPresent(u -> {
+            u.setLastSeen(ZonedDateTime.now().minusMinutes(10));
+            userRepository.save(u);
+        });
+    }
+
+    public void touch(String userId) {
+        userRepository.findById(userId).ifPresent(u -> {
+            u.setLastSeen(ZonedDateTime.now());
+            userRepository.save(u);
+        });
     }
 }

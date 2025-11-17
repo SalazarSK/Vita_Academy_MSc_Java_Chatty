@@ -4,7 +4,9 @@ public record UserRespDTO(
         String uid,
         String firstName,
         String lastName,
-        String userName
+        String userName,
+        boolean online
+
 ) {
 
 }

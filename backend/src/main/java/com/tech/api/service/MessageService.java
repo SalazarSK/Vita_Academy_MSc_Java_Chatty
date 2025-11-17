@@ -20,6 +20,8 @@ public class MessageService {
     private final ChatMapper mapper;
 
     public List<MessageDto> getConversation(String userId, String otherId) {
+        userService.touch(userId);
+
         return messageRepository
                 .findByFromIdAndToIdOrFromIdAndToIdOrderBySentAtAsc(
                         userId, otherId,
@@ -38,6 +40,8 @@ public class MessageService {
         m.setFrom(from);
         m.setTo(to);
         m.setContent(request.content());
+
+        userService.touch(from.getId());
 
         Message saved = messageRepository.save(m);
         return mapper.toMessageDto(saved);

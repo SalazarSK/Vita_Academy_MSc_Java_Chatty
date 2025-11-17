@@ -15,6 +15,12 @@ export const login = async (username, password) => {
   return res.data;
 };
 
+export const logout = async (userId) => {
+  return client.post("/user/logout", null, {
+    params: { userId },
+  });
+};
+
 // --- USERS ---
 export const getUsers = async () => {
   const res = await client.get("/user/users");

@@ -41,4 +41,9 @@ public class UserController {
     public String delete(@PathVariable String id) {
         return id;
     }
+
+    @PostMapping("/logout")
+    public void logout(@RequestParam String userId) {
+        userService.logout(userId);
+    }
 }

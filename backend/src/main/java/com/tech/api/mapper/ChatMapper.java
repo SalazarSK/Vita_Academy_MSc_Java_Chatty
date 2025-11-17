@@ -6,6 +6,8 @@ import com.tech.api.entity.Message;
 import com.tech.api.entity.User;
 import org.springframework.stereotype.Component;
 
+import java.time.ZonedDateTime;
+
 @Component
 public class ChatMapper {
 
@@ -14,7 +16,8 @@ public class ChatMapper {
                 u.getId(),
                 u.getUsername(),
                 u.getFirstName(),
-                u.getLastName()
+                u.getLastName(),
+                isOnline(u.getLastSeen())
         );
     }
 
@@ -26,5 +29,10 @@ public class ChatMapper {
                 m.getContent(),
                 m.getSentAt()
         );
+    }
+
+    private boolean isOnline(ZonedDateTime lastSeen) {
+        if (lastSeen == null) return false;
+        return lastSeen.isAfter(ZonedDateTime.now().minusMinutes(1));
     }
 }
