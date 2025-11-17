@@ -21,7 +21,7 @@ public class MessageService {
 
     public List<MessageDto> getConversation(String userId, String otherId) {
         return messageRepository
-                .findByFrom_IdAndTo_IdOrFrom_IdAndTo_Id(
+                .findByFromIdAndToIdOrFromIdAndToIdOrderBySentAtAsc(
                         userId, otherId,
                         otherId, userId
                 )

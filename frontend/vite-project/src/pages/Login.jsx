@@ -7,19 +7,32 @@ import {
   Typography,
   Stack,
 } from "@mui/material";
+import { login } from "../api/api";
 
 export default function Login({ onLogin }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
 
-  const handleLogin = () => {
-    if (!username.trim() || !password.trim()) return;
+  const handleSignIn = async () => {
+    setError(false);
+    setErrorMsg("");
 
-    // MOCK LOGIN – posielame späť mock user objekt
-    onLogin({
-      id: 1,
-      username,
-    });
+    if (!username.trim() || !password.trim()) {
+      setError(true);
+      setErrorMsg("Please fill in both fields.");
+      return;
+    }
+
+    try {
+      const user = await login(username.trim(), password.trim());
+      onLogin(user);
+    } catch (e) {
+      setError(true);
+      setErrorMsg("Invalid username or password.");
+      console.error(e);
+    }
   };
 
   return (
@@ -52,14 +65,18 @@ export default function Login({ onLogin }) {
             label="Username"
             variant="outlined"
             fullWidth
+            error={error}
             value={username}
             onChange={(e) => setUsername(e.target.value)}
           />
+
           <TextField
             label="Password"
             type="password"
             variant="outlined"
             fullWidth
+            error={error}
+            helperText={error ? errorMsg : ""}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
@@ -67,7 +84,7 @@ export default function Login({ onLogin }) {
           <Button
             variant="contained"
             size="large"
-            onClick={handleLogin}
+            onClick={handleSignIn}
             sx={{
               mt: 1,
               borderRadius: 2,

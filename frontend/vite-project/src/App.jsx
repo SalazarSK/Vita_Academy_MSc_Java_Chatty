@@ -7,5 +7,5 @@ export default function App() {
 
   if (!user) return <Login onLogin={setUser} />;
 
-  return <Chat user={user} />;
+  return <Chat user={user} onLogout={setUser} />;
 }

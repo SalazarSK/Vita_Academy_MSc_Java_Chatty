@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState, Fragment } from "react";
 import {
   Box,
   Paper,
@@ -6,47 +6,106 @@ import {
   List,
   ListItemButton,
   ListItemText,
+  Divider,
   Stack,
   TextField,
   Button,
 } from "@mui/material";
-
-const MOCK_USERS = [
-  { id: 1, username: "Alice", online: true },
-  { id: 2, username: "Bob", online: true },
-  { id: 3, username: "Charlie", online: false },
-];
-
-const MOCK_MESSAGES = {
-  1: [
-    { id: 1, from: "Alice", content: "Hi, how are you?" },
-    { id: 2, from: "You", content: "All good, working on the assignment. :)" },
-  ],
-  2: [{ id: 3, from: "Bob", content: "Hey, let's grab a coffee later." }],
-  3: [],
-};
+import { getUsers, getMessages, sendMessage } from "../api/api";
 
 export default function Chat({ user, onLogout }) {
-  const [selectedUser, setSelectedUser] = useState(MOCK_USERS[0]);
-  const [messages, setMessages] = useState(MOCK_MESSAGES[MOCK_USERS[0].id]);
+  const [users, setUsers] = useState([]);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
+
+  const handleLogout = async () => {
+    {
+      onLogout(null);
+    }
+  };
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await getUsers();
+        setUsers(data);
+        if (data.length > 0) {
+          setSelectedUser(data[0]);
+        }
+      } catch (e) {
+        console.error("Failed to load users", e);
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (!user || !selectedUser) return;
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const data = await getMessages(user.id, selectedUser.uid);
+        if (!cancelled) {
+          setMessages(data || []);
+        }
+      } catch (e) {
+        console.error("Failed to load messages", e);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, selectedUser?.uid]);
 
   const handleSelectUser = (u) => {
     setSelectedUser(u);
-    setMessages(MOCK_MESSAGES[u.id] || []);
+    setMessages([]);
   };
 
-  const handleSend = () => {
-    if (!text.trim()) return;
+  const handleSend = async () => {
+    if (!text.trim() || !selectedUser) return;
 
-    const newMsg = {
-      id: Date.now(),
-      from: "You",
-      content: text.trim(),
-    };
+    try {
+      await sendMessage({
+        fromUserId: user.id,
+        toUserId: selectedUser.uid,
+        content: text.trim(),
+      });
+      setText("");
 
-    setMessages((prev) => [...prev, newMsg]);
-    setText("");
+      const data = await getMessages(user.id, selectedUser.uid);
+      setMessages(data || []);
+    } catch (e) {
+      console.error("Failed to send message", e);
+    }
+  };
+
+  const sortedMessages = useMemo(() => {
+    return [...messages].sort((a, b) => {
+      if (!a.sentAt || !b.sentAt) return 0;
+      return new Date(a.sentAt) - new Date(b.sentAt);
+    });
+  }, [messages]);
+
+  const shouldShowTimestamp = (prev, current) => {
+    if (!current?.sentAt) return false;
+    if (!prev?.sentAt) return true;
+
+    const prevTime = new Date(prev.sentAt).getTime();
+    const curTime = new Date(current.sentAt).getTime();
+
+    return curTime - prevTime >= 10 * 60 * 1000;
+  };
+
+  const formatTime = (isoString) => {
+    if (!isoString) return "";
+    return new Date(isoString).toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   };
 
   return (
@@ -62,7 +121,7 @@ export default function Chat({ user, onLogout }) {
       }}
     >
       <Paper
-        elevation={6}
+        elevation={8}
         sx={{
           width: "100%",
           maxWidth: 1100,
@@ -93,7 +152,7 @@ export default function Chat({ user, onLogout }) {
           </Box>
 
           <List dense sx={{ flex: 1, overflowY: "auto" }}>
-            {MOCK_USERS.map((u) => (
+            {users.map((u) => (
               <ListItemButton
                 key={u.id}
                 selected={selectedUser?.id === u.id}
@@ -120,11 +179,9 @@ export default function Chat({ user, onLogout }) {
                     }}
                   />
                   <ListItemText
-                    primary={u.username}
+                    primary={`${u.firstName} ${u.lastName}`}
                     secondary={u.online ? "online" : "offline"}
-                    secondaryTypographyProps={{
-                      sx: { fontSize: 11 },
-                    }}
+                    secondaryTypographyProps={{ sx: { fontSize: 11 } }}
                   />
                 </Stack>
               </ListItemButton>
@@ -132,7 +189,7 @@ export default function Chat({ user, onLogout }) {
           </List>
 
           <Box sx={{ p: 2, borderTop: "1px solid #e5e7eb" }}>
-            <Button variant="outlined" fullWidth onClick={onLogout}>
+            <Button variant="outlined" fullWidth onClick={handleLogout}>
               Logout
             </Button>
           </Box>
@@ -148,7 +205,9 @@ export default function Chat({ user, onLogout }) {
             }}
           >
             <Typography variant="h6" fontWeight={600}>
-              Chat with {selectedUser?.username}
+              {selectedUser
+                ? `Chat with ${selectedUser.firstName} ${selectedUser.lastName}`
+                : "Select a user to start chatting"}
             </Typography>
           </Box>
 
@@ -162,40 +221,72 @@ export default function Chat({ user, onLogout }) {
                 "radial-gradient(circle at top left, #eef2ff 0, #ffffff 40%)",
             }}
           >
-            {messages.length === 0 && (
+            {sortedMessages.length === 0 && selectedUser && (
               <Typography color="text.secondary">
                 No messages yet. Start the conversation 👋
               </Typography>
             )}
 
             <Stack spacing={1.5}>
-              {messages.map((m) => (
-                <Box
-                  key={m.id}
-                  sx={{
-                    display: "flex",
-                    justifyContent:
-                      m.from === "You" ? "flex-end" : "flex-start",
-                  }}
-                >
-                  <Paper
-                    sx={{
-                      p: 1.3,
-                      px: 1.8,
-                      maxWidth: "70%",
-                      bgcolor: m.from === "You" ? "#4A6CF7" : "#f3f4f6",
-                      color: m.from === "You" ? "#ffffff" : "inherit",
-                      borderRadius: 3,
-                      borderTopRightRadius: m.from === "You" ? 4 : 3,
-                      borderTopLeftRadius: m.from === "You" ? 3 : 4,
-                    }}
-                  >
-                    <Typography variant="body2">{m.content}</Typography>
-                  </Paper>
-                </Box>
-              ))}
+              {sortedMessages.map((m, index) => {
+                const prev = index > 0 ? sortedMessages[index - 1] : null;
+                const isMine = m.fromUserId === user.id;
+                const showTime = shouldShowTimestamp(prev, m);
+
+                return (
+                  <Fragment key={m.id}>
+                    {showTime && (
+                      <Box
+                        sx={{
+                          display: "flex",
+                          justifyContent: "center",
+                          mb: 0.5,
+                        }}
+                      >
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                          sx={{
+                            px: 1.5,
+                            py: 0.3,
+                            bgcolor: "#e5e7eb",
+                            borderRadius: 10,
+                          }}
+                        >
+                          {formatTime(m.sentAt)}
+                        </Typography>
+                      </Box>
+                    )}
+
+                    <Box
+                      sx={{
+                        display: "flex",
+                        justifyContent: isMine ? "flex-end" : "flex-start",
+                      }}
+                    >
+                      <Paper
+                        sx={{
+                          p: 1.3,
+                          px: 1.8,
+                          maxWidth: "70%",
+                          bgcolor: isMine ? "#4A6CF7" : "#f3f4f6",
+                          color: isMine ? "#ffffff" : "inherit",
+                          borderRadius: 3,
+                          borderTopRightRadius: isMine ? 4 : 3,
+                          borderTopLeftRadius: isMine ? 3 : 4,
+                          boxShadow: "0 2px 6px rgba(15,23,42,0.08)",
+                        }}
+                      >
+                        <Typography variant="body2">{m.content}</Typography>
+                      </Paper>
+                    </Box>
+                  </Fragment>
+                );
+              })}
             </Stack>
           </Box>
+
+          <Divider />
 
           {/* Input */}
           <Box
@@ -212,8 +303,13 @@ export default function Chat({ user, onLogout }) {
                 value={text}
                 onChange={(e) => setText(e.target.value)}
                 size="small"
+                disabled={!selectedUser}
               />
-              <Button variant="contained" onClick={handleSend}>
+              <Button
+                variant="contained"
+                onClick={handleSend}
+                disabled={!selectedUser || !text.trim()}
+              >
                 Send
               </Button>
             </Stack>

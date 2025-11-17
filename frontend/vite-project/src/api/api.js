@@ -1,20 +1,41 @@
+import axios from "axios";
+
 const API = import.meta.env.VITE_API_URL;
 
-export const login = async (username) =>
-  fetch(`${API}/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username }),
-  }).then((res) => res.json());
+const client = axios.create({
+  baseURL: API,
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
 
-export const getUsers = () => fetch(`${API}/users`).then((res) => res.json());
+// --- AUTH ---
+export const login = async (username, password) => {
+  const res = await client.post("/user/auth/login", { username, password });
+  return res.data;
+};
 
-export const sendMessage = (msg) =>
-  fetch(`${API}/messages`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(msg),
-  }).then((res) => res.json());
+// --- USERS ---
+export const getUsers = async () => {
+  const res = await client.get("/user/users");
+  return res.data;
+};
 
-export const getMessages = (me, other) =>
-  fetch(`${API}/messages?user=${me}&with=${other}`).then((res) => res.json());
+// --- MESSAGES ---
+export const sendMessage = async (msg) => {
+  const res = await client.post("/messages", msg);
+  return res.data;
+};
+
+export const getMessages = async (me, other) => {
+  console.log(me, other);
+  const res = await client.get(`/messages/conversation`, {
+    params: {
+      userId: me,
+      otherId: other,
+    },
+  });
+  return res.data;
+};
+
+export default client;
