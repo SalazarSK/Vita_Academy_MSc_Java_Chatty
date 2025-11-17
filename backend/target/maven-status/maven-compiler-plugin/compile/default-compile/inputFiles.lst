@@ -1,11 +1,14 @@
 /Users/lubos/Desktop/Documents/Pantheon/Entry/Chatty/backend/src/main/java/com/tech/api/ApiApplication.java
+/Users/lubos/Desktop/Documents/Pantheon/Entry/Chatty/backend/src/main/java/com/tech/api/configuration/CorsConfig.java
+/Users/lubos/Desktop/Documents/Pantheon/Entry/Chatty/backend/src/main/java/com/tech/api/configuration/DataInitializer.java
 /Users/lubos/Desktop/Documents/Pantheon/Entry/Chatty/backend/src/main/java/com/tech/api/configuration/SecurityConfig.java
 /Users/lubos/Desktop/Documents/Pantheon/Entry/Chatty/backend/src/main/java/com/tech/api/configuration/SwaggerConfig.java
 /Users/lubos/Desktop/Documents/Pantheon/Entry/Chatty/backend/src/main/java/com/tech/api/controller/BasicController.java
 /Users/lubos/Desktop/Documents/Pantheon/Entry/Chatty/backend/src/main/java/com/tech/api/dto/UserDTO.java
 /Users/lubos/Desktop/Documents/Pantheon/Entry/Chatty/backend/src/main/java/com/tech/api/dto/UserRespDTO.java
+/Users/lubos/Desktop/Documents/Pantheon/Entry/Chatty/backend/src/main/java/com/tech/api/entity/Message.java
 /Users/lubos/Desktop/Documents/Pantheon/Entry/Chatty/backend/src/main/java/com/tech/api/entity/User.java
-/Users/lubos/Desktop/Documents/Pantheon/Entry/Chatty/backend/src/main/java/com/tech/api/entity/UserRole.java
 /Users/lubos/Desktop/Documents/Pantheon/Entry/Chatty/backend/src/main/java/com/tech/api/mapper/UserMapper.java
+/Users/lubos/Desktop/Documents/Pantheon/Entry/Chatty/backend/src/main/java/com/tech/api/repository/MessageRepository.java
 /Users/lubos/Desktop/Documents/Pantheon/Entry/Chatty/backend/src/main/java/com/tech/api/repository/UserRepository.java
 /Users/lubos/Desktop/Documents/Pantheon/Entry/Chatty/backend/src/main/java/com/tech/api/service/UserService.java

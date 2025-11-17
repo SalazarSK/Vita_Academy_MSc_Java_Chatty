@@ -1,26 +1,31 @@
 package com.tech.api.controller;
 
+import com.tech.api.dto.LoginRequest;
+import com.tech.api.dto.LoginResponse;
 import com.tech.api.dto.UserDTO;
 import com.tech.api.dto.UserRespDTO;
 import com.tech.api.entity.User;
 import com.tech.api.mapper.UserMapper;
 import com.tech.api.service.UserService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
-@RequestMapping("/basic")
+@RequestMapping("/user")
 @RequiredArgsConstructor
-public class BasicController {
+public class UserController {
     private final UserService userService;
 
-    @GetMapping
-    public String get() {
-        List<User> users = userService.getUsers();
-        return "Hello World";
+    @PostMapping("/auth/login")
+    public LoginResponse login(@RequestBody LoginRequest request) {
+        return userService.login(request);
+    }
+
+    @GetMapping("/users")
+    public List<UserRespDTO> getUsers() {
+        return userService.getAllUsers();
     }
 
     @PostMapping

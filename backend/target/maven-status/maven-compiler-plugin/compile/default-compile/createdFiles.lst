@@ -1,11 +1,14 @@
 com/tech/api/controller/BasicController.class
+com/tech/api/entity/Message.class
 com/tech/api/service/UserService.class
+com/tech/api/configuration/DataInitializer.class
 com/tech/api/dto/UserRespDTO.class
 com/tech/api/mapper/UserMapper.class
 com/tech/api/configuration/SecurityConfig.class
 com/tech/api/ApiApplication.class
 com/tech/api/dto/UserDTO.class
-com/tech/api/entity/UserRole.class
+com/tech/api/configuration/CorsConfig.class
 com/tech/api/configuration/SwaggerConfig.class
 com/tech/api/entity/User.class
+com/tech/api/repository/MessageRepository.class
 com/tech/api/repository/UserRepository.class

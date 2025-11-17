@@ -13,13 +13,17 @@ import java.util.UUID;
 public class User {
     @Id
     private String id = UUID.randomUUID().toString();
+
+    @Column(nullable = false, unique = true, length = 50)
+    private String username;
+
+    @Column(nullable = false)
+    private String password;
+
     private String firstName;
     private String lastName;
-    @Column(unique = true)
-    private String username;
-    private String password;
-    @Enumerated(value = EnumType.STRING)
-    private UserRole role = UserRole.USER;
+
     private ZonedDateTime created = ZonedDateTime.now();
     private ZonedDateTime updated;
+    private ZonedDateTime lastSeen;
 }
