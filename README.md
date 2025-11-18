@@ -84,6 +84,6 @@ The frontend starts at:
 ## **3. Testing**
 
 Users:
-**Username:** alice **Password:** password1
-**Username:** bob **Password:** password2
-**Username:** charlie **Password:** password3
+* **Username:** alice **Password:** password1
+* **Username:** bob **Password:** password2
+* **Username:** charlie **Password:** password3
