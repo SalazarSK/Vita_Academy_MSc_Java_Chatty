@@ -1,9 +1,6 @@
 package com.tech.api.controller;
 
-import com.tech.api.dto.LoginRequest;
-import com.tech.api.dto.LoginResponse;
-import com.tech.api.dto.UserDTO;
-import com.tech.api.dto.UserRespDTO;
+import com.tech.api.dto.*;
 import com.tech.api.entity.User;
 import com.tech.api.mapper.UserMapper;
 import com.tech.api.service.UserService;
@@ -45,5 +42,10 @@ public class UserController {
     @PostMapping("/logout")
     public void logout(@RequestParam String userId) {
         userService.logout(userId);
+    }
+
+    @PostMapping("/register")
+    public LoginResponse register(@RequestBody RegisterRequest request) {
+        return userService.register(request);
     }
 }

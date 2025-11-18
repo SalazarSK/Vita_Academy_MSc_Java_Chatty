@@ -1,9 +1,6 @@
 package com.tech.api.service;
 
-import com.tech.api.dto.LoginRequest;
-import com.tech.api.dto.LoginResponse;
-import com.tech.api.dto.UserDTO;
-import com.tech.api.dto.UserRespDTO;
+import com.tech.api.dto.*;
 import com.tech.api.entity.User;
 import com.tech.api.mapper.ChatMapper;
 import com.tech.api.repository.UserRepository;
@@ -53,6 +50,29 @@ public class UserService {
             throw new RuntimeException("Invalid credentials");
         }
         touch(user.getId());
+
+        return new LoginResponse(
+                user.getId(),
+                user.getUsername(),
+                user.getFirstName(),
+                user.getLastName()
+        );
+    }
+
+    public LoginResponse register(RegisterRequest request) {
+        if (userRepository.existsByUsername(request.username())) {
+            throw new RuntimeException("Username already taken");
+        }
+
+        User user = new User();
+        user.setUsername(request.username());
+        user.setPassword(passwordEncoder.encode(request.password()));
+        user.setFirstName(request.firstName());
+        user.setLastName(request.lastName());
+        user.setCreated(ZonedDateTime.now());
+        user.setLastSeen(ZonedDateTime.now());
+
+        userRepository.save(user);
 
         return new LoginResponse(
                 user.getId(),
