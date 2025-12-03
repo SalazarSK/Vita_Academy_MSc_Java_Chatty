@@ -1,1 +1,5 @@
+com/tech/api/controller/UserControllerTest.class
+com/tech/api/controller/MessageServiceTest.class
 com/tech/api/ApiApplicationTests.class
+com/tech/api/performance/UserPerformanceTest.class
+com/tech/api/performance/MessagePerformanceTest.class

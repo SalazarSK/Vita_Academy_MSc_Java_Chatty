@@ -1,1 +1,5 @@
-/Users/lubos/Desktop/Documents/Pantheon/Entry/Chatty/backend/src/test/java/com/tech/api/ApiApplicationTests.java
+/Users/lubos/Desktop/Documents/VitaAcademy/MSc Java/Chatty/backend/src/test/java/com/tech/api/ApiApplicationTests.java
+/Users/lubos/Desktop/Documents/VitaAcademy/MSc Java/Chatty/backend/src/test/java/com/tech/api/controller/MessageServiceTest.java
+/Users/lubos/Desktop/Documents/VitaAcademy/MSc Java/Chatty/backend/src/test/java/com/tech/api/controller/UserControllerTest.java
+/Users/lubos/Desktop/Documents/VitaAcademy/MSc Java/Chatty/backend/src/test/java/com/tech/api/performance/MessagePerformanceTest.java
+/Users/lubos/Desktop/Documents/VitaAcademy/MSc Java/Chatty/backend/src/test/java/com/tech/api/performance/UserPerformanceTest.java

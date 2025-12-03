@@ -1,2 +1,3 @@
 /backend/mysql_data
+/backend/target
 /frontend/vite-project/node_modules
