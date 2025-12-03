@@ -1,9 +1,3 @@
-# **pantheon_assignment**
-
-I received an assignment from Pantheon to test my skills, and I chose to develop a simple Spring Boot application with a React-based web frontend.
-
----
-
 ## **1. Start the MySQL Database (Docker)**
 
 Inside the **backend** folder (where `docker-compose.yml` is located), run:
