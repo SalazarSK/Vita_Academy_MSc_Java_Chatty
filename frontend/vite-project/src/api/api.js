@@ -37,20 +37,27 @@ export const getUsers = async () => {
   return res.data;
 };
 
-// --- MESSAGES ---
-export const sendMessage = async (msg) => {
-  const res = await client.post("/messages", msg);
+// --- ROOMS ---
+export const getRooms = async () => {
+  const res = await client.get("/rooms");
   return res.data;
 };
 
-export const getMessages = async (me, other) => {
-  console.log(me, other);
-  const res = await client.get(`/messages/conversation`, {
-    params: {
-      userId: me,
-      otherId: other,
-    },
-  });
+// --- MESSAGES (ROOM-BASED) ---
+
+// GET /rooms/{roomId}/messages?userId=...&tag=...
+export const getMessagesForRoom = async (roomId, userId, tag) => {
+  const params = { userId };
+  if (tag) params.tag = tag;
+
+  const res = await client.get(`/rooms/${roomId}/messages`, { params });
+  return res.data;
+};
+
+// POST /rooms/{roomId}/messages
+// payload: { fromUserId, content, tags: string[] }
+export const sendMessageToRoom = async (roomId, msg) => {
+  const res = await client.post(`/rooms/${roomId}/messages`, msg);
   return res.data;
 };
 
