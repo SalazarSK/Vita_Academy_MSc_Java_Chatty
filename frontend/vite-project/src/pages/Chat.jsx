@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, Fragment, useRef } from "react";
+import { useEffect, useMemo, useRef, useState, Fragment } from "react";
 import {
   Box,
   Paper,
@@ -10,22 +10,29 @@ import {
   Stack,
   TextField,
   Button,
+  Chip,
 } from "@mui/material";
-import { getUsers, getMessages, sendMessage, logout } from "../api/api";
+import {
+  getRooms,
+  getMessagesForRoom,
+  sendMessageToRoom,
+  logout,
+} from "../api/api";
 import { connectWebSocket, disconnectWebSocket } from "../wsClient";
 
 export default function Chat({ user, onLogout }) {
   const messagesContainerRef = useRef(null);
-  const [users, setUsers] = useState([]);
-  const [selectedUser, setSelectedUser] = useState(null);
+
+  const [rooms, setRooms] = useState([]);
+  const [selectedRoom, setSelectedRoom] = useState(null);
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
+  const [tagsInput, setTagsInput] = useState("");
   const [stompClient, setStompClient] = useState(null);
 
   const handleLogout = async () => {
     try {
       await logout(user.id);
-      onLogout(null);
     } catch (e) {
       console.error("Logout failed", e);
     } finally {
@@ -33,125 +40,60 @@ export default function Chat({ user, onLogout }) {
     }
   };
 
+  // načítanie roomiek
   useEffect(() => {
     if (!user) return;
 
-    const loadUsers = async () => {
+    (async () => {
       try {
-        const data = await getUsers();
-        const others = data.filter(
-          (u) =>
-            String(u.id) !== String(user.id) &&
-            String(u.uid) !== String(user.id)
-        );
-
-        setUsers(others);
-        if (!selectedUser && others.length > 0) {
-          setSelectedUser(others[0]);
+        const data = await getRooms();
+        setRooms(data || []);
+        if (!selectedRoom && data && data.length > 0) {
+          setSelectedRoom(data[0]);
         }
       } catch (e) {
-        console.error("Failed to load users", e);
+        console.error("Failed to load rooms", e);
       }
-    };
-
-    loadUsers();
+    })();
   }, [user?.id]);
 
-  useEffect(() => {
-    if (!user) return;
-
-    const refresh = async () => {
-      try {
-        const data = await getUsers();
-        const others = data.filter(
-          (u) =>
-            String(u.id) !== String(user.id) &&
-            String(u.uid) !== String(user.id)
-        );
-        setUsers(others);
-      } catch (e) {
-        console.error("Failed to refresh users", e);
-      }
-    };
-
-    const interval = setInterval(refresh, 5000);
-    return () => clearInterval(interval);
-  }, [user?.id]);
-
+  // WebSocket connect
   useEffect(() => {
     if (!user) return;
 
     const client = connectWebSocket((stomp) => {
       setStompClient(stomp);
-
-      stomp.publish({
-        destination: "/app/presence.update",
-        body: JSON.stringify({ userId: user.id, online: true }),
-      });
-
-      stomp.subscribe("/topic/user-status", (msg) => {
-        const status = JSON.parse(msg.body); // { userId, online }
-
-        setUsers((prev) =>
-          prev.map((u) =>
-            String(u.uid) === String(status.userId) ||
-            String(u.id) === String(status.userId)
-              ? { ...u, online: status.online }
-              : u
-          )
-        );
-      });
     });
 
-    const handleBeforeUnload = () => {
-      try {
-        client.publish({
-          destination: "/app/presence.update",
-          body: JSON.stringify({ userId: user.id, online: false }),
-        });
-      } catch (_) {}
-    };
-
-    window.addEventListener("beforeunload", handleBeforeUnload);
-
     return () => {
-      window.removeEventListener("beforeunload", handleBeforeUnload);
-      try {
-        client.publish({
-          destination: "/app/presence.update",
-          body: JSON.stringify({ userId: user.id, online: false }),
-        });
-      } catch (_) {}
       disconnectWebSocket(client);
     };
   }, [user?.id]);
 
+  // WebSocket – subscribe na aktuálnu roomku
   useEffect(() => {
-    if (!stompClient || !user || !selectedUser) return;
+    if (!stompClient || !selectedRoom) return;
 
-    const convId = getConversationId(user.id, selectedUser.uid);
-
-    const subscription = stompClient.subscribe(
-      `/topic/conversation/${convId}`,
+    const sub = stompClient.subscribe(
+      `/topic/rooms/${selectedRoom.id}`,
       (msg) => {
         const message = JSON.parse(msg.body);
         setMessages((prev) => [...prev, message]);
       }
     );
 
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, [stompClient, user?.id, selectedUser?.uid]);
+    return () => sub.unsubscribe();
+  }, [stompClient, selectedRoom?.id]);
 
+  // načítanie správ pre roomku
   useEffect(() => {
-    if (!user || !selectedUser) return;
+    if (!user || !selectedRoom) return;
 
     let cancelled = false;
 
     (async () => {
       try {
-        const data = await getMessages(user.id, selectedUser.uid);
+        const data = await getMessagesForRoom(selectedRoom.id, user.id);
         if (!cancelled) {
           setMessages(data || []);
         }
@@ -163,20 +105,26 @@ export default function Chat({ user, onLogout }) {
     return () => {
       cancelled = true;
     };
-  }, [user?.id, selectedUser?.uid]);
+  }, [user?.id, selectedRoom?.id]);
 
-  const handleSelectUser = (u) => {
-    setSelectedUser(u);
+  const handleSelectRoom = (room) => {
+    setSelectedRoom(room);
     setMessages([]);
   };
 
+  const parseTags = (input) =>
+    input
+      .split(",")
+      .map((t) => t.trim())
+      .filter((t) => t.length > 0);
+
   const handleSend = async () => {
-    if (!text.trim() || !selectedUser) return;
+    if (!text.trim() || !selectedRoom) return;
 
     const payload = {
       fromUserId: user.id,
-      toUserId: selectedUser.uid,
       content: text.trim(),
+      tags: parseTags(tagsInput),
     };
 
     try {
@@ -184,12 +132,12 @@ export default function Chat({ user, onLogout }) {
 
       if (stompClient) {
         stompClient.publish({
-          destination: "/app/chat.send",
+          destination: `/app/rooms/${selectedRoom.id}/send`,
           body: JSON.stringify(payload),
         });
       } else {
-        await sendMessage(payload);
-        const data = await getMessages(user.id, selectedUser.uid);
+        await sendMessageToRoom(selectedRoom.id, payload);
+        const data = await getMessagesForRoom(selectedRoom.id, user.id);
         setMessages(data || []);
       }
     } catch (e) {
@@ -197,18 +145,14 @@ export default function Chat({ user, onLogout }) {
     }
   };
 
-  const getConversationId = (a, b) => {
-    const aa = String(a);
-    const bb = String(b);
-    return aa < bb ? `${aa}_${bb}` : `${bb}_${aa}`;
-  };
-
-  const sortedMessages = useMemo(() => {
-    return [...messages].sort((a, b) => {
-      if (!a.sentAt || !b.sentAt) return 0;
-      return new Date(a.sentAt) - new Date(b.sentAt);
-    });
-  }, [messages]);
+  const sortedMessages = useMemo(
+    () =>
+      [...messages].sort((a, b) => {
+        if (!a.sentAt || !b.sentAt) return 0;
+        return new Date(a.sentAt) - new Date(b.sentAt);
+      }),
+    [messages]
+  );
 
   const shouldShowTimestamp = (prev, current) => {
     if (!current?.sentAt) return false;
@@ -220,20 +164,19 @@ export default function Chat({ user, onLogout }) {
     return curTime - prevTime >= 10 * 60 * 1000;
   };
 
-  const formatTime = (isoString) => {
-    if (!isoString) return "";
-    return new Date(isoString).toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
+  const formatTime = (isoString) =>
+    !isoString
+      ? ""
+      : new Date(isoString).toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        });
 
   useEffect(() => {
     if (!messagesContainerRef.current) return;
     const el = messagesContainerRef.current;
-
     el.scrollTop = el.scrollHeight;
-  }, [sortedMessages.length, selectedUser?.uid]);
+  }, [sortedMessages.length, selectedRoom?.id]);
 
   return (
     <Box
@@ -259,10 +202,10 @@ export default function Chat({ user, onLogout }) {
           bgcolor: "#f3f4f6",
         }}
       >
-        {/* LEFT – users */}
+        {/* LEFT – rooms */}
         <Box
           sx={{
-            width: 280,
+            width: 260,
             borderRight: "1px solid #e5e7eb",
             bgcolor: "#ffffff",
             display: "flex",
@@ -271,7 +214,7 @@ export default function Chat({ user, onLogout }) {
         >
           <Box sx={{ p: 2.5, borderBottom: "1px solid #e5e7eb" }}>
             <Typography variant="h6" fontWeight={600}>
-              Users
+              Rooms
             </Typography>
             <Typography variant="body2" color="text.secondary">
               Logged in as <strong>{user.username}</strong>
@@ -279,37 +222,18 @@ export default function Chat({ user, onLogout }) {
           </Box>
 
           <List dense sx={{ flex: 1, overflowY: "auto" }}>
-            {users.map((u) => (
+            {rooms.map((r) => (
               <ListItemButton
-                key={u.id}
-                selected={selectedUser?.id === u.id}
-                onClick={() => handleSelectUser(u)}
+                key={r.id}
+                selected={selectedRoom?.id === r.id}
+                onClick={() => handleSelectRoom(r)}
                 sx={{
                   "&.Mui-selected": {
                     bgcolor: "#eef2ff",
                   },
                 }}
               >
-                <Stack
-                  direction="row"
-                  alignItems="center"
-                  spacing={1.5}
-                  sx={{ width: "100%" }}
-                >
-                  <Box
-                    sx={{
-                      width: 10,
-                      height: 10,
-                      borderRadius: "50%",
-                      bgcolor: u.online ? "#22c55e" : "#9ca3af",
-                    }}
-                  />
-                  <ListItemText
-                    primary={`${u.firstName} ${u.lastName}`}
-                    secondary={u.online ? "online" : "offline"}
-                    secondaryTypographyProps={{ sx: { fontSize: 11 } }}
-                  />
-                </Stack>
+                <ListItemText primary={r.name} />
               </ListItemButton>
             ))}
           </List>
@@ -331,9 +255,9 @@ export default function Chat({ user, onLogout }) {
             }}
           >
             <Typography variant="h6" fontWeight={600}>
-              {selectedUser
-                ? `Chat with ${selectedUser.firstName} ${selectedUser.lastName}`
-                : "Select a user to start chatting"}
+              {selectedRoom
+                ? `Room: ${selectedRoom.name}`
+                : "Select a room to start chatting"}
             </Typography>
           </Box>
 
@@ -348,7 +272,7 @@ export default function Chat({ user, onLogout }) {
                 "radial-gradient(circle at top left, #eef2ff 0, #ffffff 40%)",
             }}
           >
-            {sortedMessages.length === 0 && selectedUser && (
+            {sortedMessages.length === 0 && selectedRoom && (
               <Typography color="text.secondary">
                 No messages yet. Start the conversation 👋
               </Typography>
@@ -404,7 +328,25 @@ export default function Chat({ user, onLogout }) {
                           boxShadow: "0 2px 6px rgba(15,23,42,0.08)",
                         }}
                       >
-                        <Typography variant="body2">{m.content}</Typography>
+                        <Typography
+                          variant="body2"
+                          sx={{ mb: m.tags?.length ? 0.5 : 0 }}
+                        >
+                          {m.content}
+                        </Typography>
+
+                        {m.tags && m.tags.length > 0 && (
+                          <Stack direction="row" spacing={0.5} flexWrap="wrap">
+                            {m.tags.map((t) => (
+                              <Chip
+                                key={t}
+                                label={t}
+                                size="small"
+                                sx={{ fontSize: 10 }}
+                              />
+                            ))}
+                          </Stack>
+                        )}
                       </Paper>
                     </Box>
                   </Fragment>
@@ -430,12 +372,20 @@ export default function Chat({ user, onLogout }) {
                 value={text}
                 onChange={(e) => setText(e.target.value)}
                 size="small"
-                disabled={!selectedUser}
+                disabled={!selectedRoom}
+              />
+              <TextField
+                placeholder="tags (comma separated)"
+                value={tagsInput}
+                onChange={(e) => setTagsInput(e.target.value)}
+                size="small"
+                sx={{ width: 220 }}
+                disabled={!selectedRoom}
               />
               <Button
                 variant="contained"
                 onClick={handleSend}
-                disabled={!selectedUser || !text.trim()}
+                disabled={!selectedRoom || !text.trim()}
               >
                 Send
               </Button>
