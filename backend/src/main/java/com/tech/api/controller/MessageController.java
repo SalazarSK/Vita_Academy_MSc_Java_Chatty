@@ -9,22 +9,36 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/messages")
+@RequestMapping("/rooms")
 @RequiredArgsConstructor
 public class MessageController {
 
     private final MessageService messageService;
 
-    @GetMapping("/conversation")
-    public List<MessageDto> conversation(
+    @GetMapping("/{roomId}/messages")
+    public List<MessageDto> getMessages(
+            @PathVariable String roomId,
             @RequestParam String userId,
-            @RequestParam String otherId
+            @RequestParam(required = false) String tag
     ) {
-        return messageService.getConversation(userId, otherId);
+        if (tag != null && !tag.isBlank()) {
+            return messageService.getMessagesForRoomByTag(roomId, tag, userId);
+        }
+        return messageService.getMessagesForRoom(roomId, userId);
     }
 
-    @PostMapping
-    public MessageDto send(@RequestBody SendMessageRequest request) {
-        return messageService.sendMessage(request);
+    @PostMapping("/{roomId}/messages")
+    public MessageDto send(
+            @PathVariable String roomId,
+            @RequestBody SendMessageRequest request
+    ) {
+        SendMessageRequest fixed = new SendMessageRequest(
+                roomId,
+                request.fromUserId(),
+                request.content(),
+                request.tags()
+        );
+
+        return messageService.sendMessage(fixed);
     }
 }

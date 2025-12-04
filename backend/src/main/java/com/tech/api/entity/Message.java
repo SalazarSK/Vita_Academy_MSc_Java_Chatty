@@ -5,6 +5,8 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.time.ZonedDateTime;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 
 @Entity
@@ -20,12 +22,19 @@ public class Message {
     private User from;
 
     @ManyToOne(optional = false)
-    @JoinColumn(name = "to_user_id")
-    private User to;
+    @JoinColumn(name = "room_id")
+    private ChatRoom room;
 
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 
+    @ManyToMany
+    @JoinTable(
+            name = "message_tags",
+            joinColumns = @JoinColumn(name = "message_id"),
+            inverseJoinColumns = @JoinColumn(name = "tag_id")
+    )
+    private Set<Tag> tags = new HashSet<>();
+
     private ZonedDateTime sentAt = ZonedDateTime.now();
 }
-
