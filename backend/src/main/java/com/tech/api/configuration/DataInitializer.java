@@ -38,7 +38,7 @@ public class DataInitializer {
             userRepository.saveAll(List.of(u1, u2, u3));
 
             ChatRoom general = chatRoomService.createRoom("general");
-
+           
             Message m1 = createMessage(u1, general, "Hi Bob, how are you?");
             Message m2 = createMessage(u2, general, "Doing great, Alice!");
             Message m3 = createMessage(u3, general, "Hello Alice!");

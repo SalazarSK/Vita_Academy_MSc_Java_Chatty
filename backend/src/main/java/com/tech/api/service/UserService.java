@@ -4,8 +4,11 @@ import com.tech.api.dto.*;
 import com.tech.api.entity.User;
 import com.tech.api.mapper.ChatMapper;
 import com.tech.api.repository.UserRepository;
+import com.tech.api.security.JwtService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.authentication.*;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -17,13 +20,16 @@ import java.util.Optional;
 @Service
 @RequiredArgsConstructor
 public class UserService {
+
     private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final ChatMapper mapper;
+    private final AuthenticationManager authenticationManager;
+    private final JwtService jwtService;
+
     public List<User> getUsers() {
         return userRepository.findAll();
     }
-    private final PasswordEncoder passwordEncoder;
-    private final ChatMapper mapper;
-
 
     public Optional<User> findByUsername(String username) {
         return userRepository.findByUsername(username);
@@ -31,35 +37,50 @@ public class UserService {
 
     public User createUser(UserDTO dto) {
         Optional<User> userExist = findByUsername(dto.userName());
-        if(userExist.isPresent()) {
+        if (userExist.isPresent()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Username already taken");
         }
         User user = new User();
         user.setFirstName(dto.firstName());
         user.setLastName(dto.lastName());
-        user.setPassword(dto.password());
         user.setUsername(dto.userName());
+        user.setPassword(passwordEncoder.encode(dto.password())); // 🔐 encode
         return userRepository.save(user);
     }
 
-    public LoginResponse login(LoginRequest request) {
+    public AuthResponse login(LoginRequest request) {
+        // overenie prihlasovacích údajov cez AuthenticationManager
+        authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(
+                        request.username(),
+                        request.password()
+                )
+        );
+
         User user = userRepository.findByUsername(request.username())
                 .orElseThrow(() -> new RuntimeException("Invalid credentials"));
 
-        if (!passwordEncoder.matches(request.password(), user.getPassword())) {
-            throw new RuntimeException("Invalid credentials");
-        }
         touch(user.getId());
 
-        return new LoginResponse(
+        UserDetails userDetails = org.springframework.security.core.userdetails.User
+                .withUsername(user.getUsername())
+                .password(user.getPassword())
+                .roles("USER")
+                .build();
+
+        String token = jwtService.generateToken(userDetails);
+
+        LoginResponse loginResponse = new LoginResponse(
                 user.getId(),
                 user.getUsername(),
                 user.getFirstName(),
                 user.getLastName()
         );
+
+        return new AuthResponse(token, loginResponse);
     }
 
-    public LoginResponse register(RegisterRequest request) {
+    public AuthResponse register(RegisterRequest request) {
         if (userRepository.existsByUsername(request.username())) {
             throw new RuntimeException("Username already taken");
         }
@@ -74,12 +95,22 @@ public class UserService {
 
         userRepository.save(user);
 
-        return new LoginResponse(
+        UserDetails userDetails = org.springframework.security.core.userdetails.User
+                .withUsername(user.getUsername())
+                .password(user.getPassword())
+                .roles("USER")
+                .build();
+
+        String token = jwtService.generateToken(userDetails);
+
+        LoginResponse loginResponse = new LoginResponse(
                 user.getId(),
                 user.getUsername(),
                 user.getFirstName(),
                 user.getLastName()
         );
+
+        return new AuthResponse(token, loginResponse);
     }
 
     public List<UserRespDTO> getAllUsers() {
