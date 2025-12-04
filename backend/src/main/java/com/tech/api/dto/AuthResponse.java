@@ -1,4 +1,6 @@
 package com.tech.api.dto;
 
-public class AuthResponse {
-}
+public record AuthResponse(
+        String token,
+        LoginResponse user
+) {}
