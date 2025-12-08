@@ -1,4 +1,7 @@
 package com.tech.api.dto;
 
-public class ChatRoomDTO {
-}
+public record ChatRoomDto(
+        String id,
+        String name,
+        boolean direct
+) {}

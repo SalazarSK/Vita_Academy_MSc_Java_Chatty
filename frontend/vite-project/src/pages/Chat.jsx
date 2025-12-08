@@ -1,34 +1,27 @@
-import { useEffect, useMemo, useRef, useState, Fragment } from "react";
+import { useEffect, useState } from "react";
+import { Box, Paper } from "@mui/material";
 import {
-  Box,
-  Paper,
-  Typography,
-  List,
-  ListItemButton,
-  ListItemText,
-  Divider,
-  Stack,
-  TextField,
-  Button,
-  Chip,
-} from "@mui/material";
-import {
+  getUsers,
   getRooms,
+  createRoom,
+  getOrCreatePrivateRoom,
   getMessagesForRoom,
   sendMessageToRoom,
   logout,
 } from "../api/api";
 import { connectWebSocket, disconnectWebSocket } from "../wsClient";
+import LeftSidebar from "../components/LeftSidebar";
+import MessagesArea from "../components/MessagesArea";
+import MessageInput from "../components/MessageInput";
+import CreateRoomDialog from "../components/CreateRoomDialog";
 
 export default function Chat({ user, onLogout }) {
-  const messagesContainerRef = useRef(null);
-
   const [rooms, setRooms] = useState([]);
   const [selectedRoom, setSelectedRoom] = useState(null);
   const [messages, setMessages] = useState([]);
-  const [text, setText] = useState("");
-  const [tagsInput, setTagsInput] = useState("");
+  const [users, setUsers] = useState([]);
   const [stompClient, setStompClient] = useState(null);
+  const [createOpen, setCreateOpen] = useState(false);
 
   const handleLogout = async () => {
     try {
@@ -40,24 +33,27 @@ export default function Chat({ user, onLogout }) {
     }
   };
 
-  // načítanie roomiek
   useEffect(() => {
     if (!user) return;
 
     (async () => {
       try {
-        const data = await getRooms();
-        setRooms(data || []);
-        if (!selectedRoom && data && data.length > 0) {
-          setSelectedRoom(data[0]);
+        const [usersResp, roomsResp] = await Promise.all([
+          getUsers(),
+          getRooms(user.id),
+        ]);
+        setUsers(usersResp || []);
+        setRooms(roomsResp || []);
+        if (!selectedRoom && roomsResp && roomsResp.length > 0) {
+          setSelectedRoom(roomsResp[0]);
         }
       } catch (e) {
-        console.error("Failed to load rooms", e);
+        console.error("Failed to load initial data", e);
       }
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
-  // WebSocket connect
   useEffect(() => {
     if (!user) return;
 
@@ -70,22 +66,20 @@ export default function Chat({ user, onLogout }) {
     };
   }, [user?.id]);
 
-  // WebSocket – subscribe na aktuálnu roomku
   useEffect(() => {
     if (!stompClient || !selectedRoom) return;
 
     const sub = stompClient.subscribe(
       `/topic/rooms/${selectedRoom.id}`,
       (msg) => {
-        const message = JSON.parse(msg.body);
-        setMessages((prev) => [...prev, message]);
+        const body = JSON.parse(msg.body);
+        setMessages((prev) => [...prev, body]);
       }
     );
 
     return () => sub.unsubscribe();
   }, [stompClient, selectedRoom?.id]);
 
-  // načítanie správ pre roomku
   useEffect(() => {
     if (!user || !selectedRoom) return;
 
@@ -112,24 +106,44 @@ export default function Chat({ user, onLogout }) {
     setMessages([]);
   };
 
-  const parseTags = (input) =>
-    input
-      .split(",")
-      .map((t) => t.trim())
-      .filter((t) => t.length > 0);
+  const handleCreateRoom = async (name, memberIds) => {
+    try {
+      const room = await createRoom({
+        name: name.trim(),
+        creatorId: user.id,
+        memberIds,
+      });
+      setRooms((prev) => [...prev, room]);
+      setSelectedRoom(room);
+      setCreateOpen(false);
+    } catch (e) {
+      console.error("Failed to create room", e);
+    }
+  };
 
-  const handleSend = async () => {
-    if (!text.trim() || !selectedRoom) return;
+  const handleStartDirectChat = async (u) => {
+    try {
+      const room = await getOrCreatePrivateRoom(user.id, u.id || u.uid);
+      setRooms((prev) => {
+        const exists = prev.some((r) => r.id === room.id);
+        return exists ? prev : [...prev, room];
+      });
+      setSelectedRoom(room);
+    } catch (e) {
+      console.error("Failed to start direct chat", e);
+    }
+  };
+
+  const handleSendMessage = async (text, tags) => {
+    if (!selectedRoom) return;
 
     const payload = {
       fromUserId: user.id,
       content: text.trim(),
-      tags: parseTags(tagsInput),
+      tags,
     };
 
     try {
-      setText("");
-
       if (stompClient) {
         stompClient.publish({
           destination: `/app/rooms/${selectedRoom.id}/send`,
@@ -145,39 +159,6 @@ export default function Chat({ user, onLogout }) {
     }
   };
 
-  const sortedMessages = useMemo(
-    () =>
-      [...messages].sort((a, b) => {
-        if (!a.sentAt || !b.sentAt) return 0;
-        return new Date(a.sentAt) - new Date(b.sentAt);
-      }),
-    [messages]
-  );
-
-  const shouldShowTimestamp = (prev, current) => {
-    if (!current?.sentAt) return false;
-    if (!prev?.sentAt) return true;
-
-    const prevTime = new Date(prev.sentAt).getTime();
-    const curTime = new Date(current.sentAt).getTime();
-
-    return curTime - prevTime >= 10 * 60 * 1000;
-  };
-
-  const formatTime = (isoString) =>
-    !isoString
-      ? ""
-      : new Date(isoString).toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-        });
-
-  useEffect(() => {
-    if (!messagesContainerRef.current) return;
-    const el = messagesContainerRef.current;
-    el.scrollTop = el.scrollHeight;
-  }, [sortedMessages.length, selectedRoom?.id]);
-
   return (
     <Box
       sx={{
@@ -191,208 +172,45 @@ export default function Chat({ user, onLogout }) {
       }}
     >
       <Paper
-        elevation={8}
+        elevation={10}
         sx={{
           width: "100%",
-          maxWidth: 1100,
-          height: "80vh",
+          maxWidth: 1200,
+          height: "82vh",
           display: "flex",
           borderRadius: 4,
           overflow: "hidden",
-          bgcolor: "#f3f4f6",
+          bgcolor: "#ffffff",
         }}
       >
-        {/* LEFT – rooms */}
-        <Box
-          sx={{
-            width: 260,
-            borderRight: "1px solid #e5e7eb",
-            bgcolor: "#ffffff",
-            display: "flex",
-            flexDirection: "column",
-          }}
-        >
-          <Box sx={{ p: 2.5, borderBottom: "1px solid #e5e7eb" }}>
-            <Typography variant="h6" fontWeight={600}>
-              Rooms
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Logged in as <strong>{user.username}</strong>
-            </Typography>
-          </Box>
+        <LeftSidebar
+          user={user}
+          rooms={rooms}
+          selectedRoomId={selectedRoom?.id}
+          onSelectRoom={handleSelectRoom}
+          users={users}
+          onStartDirectChat={handleStartDirectChat}
+          onOpenCreateRoom={() => setCreateOpen(true)}
+          onLogout={handleLogout}
+        />
 
-          <List dense sx={{ flex: 1, overflowY: "auto" }}>
-            {rooms.map((r) => (
-              <ListItemButton
-                key={r.id}
-                selected={selectedRoom?.id === r.id}
-                onClick={() => handleSelectRoom(r)}
-                sx={{
-                  "&.Mui-selected": {
-                    bgcolor: "#eef2ff",
-                  },
-                }}
-              >
-                <ListItemText primary={r.name} />
-              </ListItemButton>
-            ))}
-          </List>
-
-          <Box sx={{ p: 2, borderTop: "1px solid #e5e7eb" }}>
-            <Button variant="outlined" fullWidth onClick={handleLogout}>
-              Logout
-            </Button>
-          </Box>
-        </Box>
-
-        {/* RIGHT – chat */}
         <Box sx={{ flex: 1, display: "flex", flexDirection: "column" }}>
-          <Box
-            sx={{
-              p: 2.5,
-              borderBottom: "1px solid #e5e7eb",
-              bgcolor: "#ffffff",
-            }}
-          >
-            <Typography variant="h6" fontWeight={600}>
-              {selectedRoom
-                ? `Room: ${selectedRoom.name}`
-                : "Select a room to start chatting"}
-            </Typography>
-          </Box>
-
-          {/* Messages */}
-          <Box
-            ref={messagesContainerRef}
-            sx={{
-              flex: 1,
-              p: 3,
-              overflowY: "auto",
-              background:
-                "radial-gradient(circle at top left, #eef2ff 0, #ffffff 40%)",
-            }}
-          >
-            {sortedMessages.length === 0 && selectedRoom && (
-              <Typography color="text.secondary">
-                No messages yet. Start the conversation 👋
-              </Typography>
-            )}
-
-            <Stack spacing={1.5}>
-              {sortedMessages.map((m, index) => {
-                const prev = index > 0 ? sortedMessages[index - 1] : null;
-                const isMine = m.fromUserId === user.id;
-                const showTime = shouldShowTimestamp(prev, m);
-
-                return (
-                  <Fragment key={m.id}>
-                    {showTime && (
-                      <Box
-                        sx={{
-                          display: "flex",
-                          justifyContent: "center",
-                          mb: 0.5,
-                        }}
-                      >
-                        <Typography
-                          variant="caption"
-                          color="text.secondary"
-                          sx={{
-                            px: 1.5,
-                            py: 0.3,
-                            bgcolor: "#e5e7eb",
-                            borderRadius: 10,
-                          }}
-                        >
-                          {formatTime(m.sentAt)}
-                        </Typography>
-                      </Box>
-                    )}
-
-                    <Box
-                      sx={{
-                        display: "flex",
-                        justifyContent: isMine ? "flex-end" : "flex-start",
-                      }}
-                    >
-                      <Paper
-                        sx={{
-                          p: 1.3,
-                          px: 1.8,
-                          maxWidth: "70%",
-                          bgcolor: isMine ? "#4A6CF7" : "#f3f4f6",
-                          color: isMine ? "#ffffff" : "inherit",
-                          borderRadius: 3,
-                          borderTopRightRadius: isMine ? 4 : 3,
-                          borderTopLeftRadius: isMine ? 3 : 4,
-                          boxShadow: "0 2px 6px rgba(15,23,42,0.08)",
-                        }}
-                      >
-                        <Typography
-                          variant="body2"
-                          sx={{ mb: m.tags?.length ? 0.5 : 0 }}
-                        >
-                          {m.content}
-                        </Typography>
-
-                        {m.tags && m.tags.length > 0 && (
-                          <Stack direction="row" spacing={0.5} flexWrap="wrap">
-                            {m.tags.map((t) => (
-                              <Chip
-                                key={t}
-                                label={t}
-                                size="small"
-                                sx={{ fontSize: 10 }}
-                              />
-                            ))}
-                          </Stack>
-                        )}
-                      </Paper>
-                    </Box>
-                  </Fragment>
-                );
-              })}
-            </Stack>
-          </Box>
-
-          <Divider />
-
-          {/* Input */}
-          <Box
-            sx={{
-              p: 2,
-              borderTop: "1px solid #e5e7eb",
-              bgcolor: "#ffffff",
-            }}
-          >
-            <Stack direction="row" spacing={2}>
-              <TextField
-                fullWidth
-                placeholder="Type a message..."
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                size="small"
-                disabled={!selectedRoom}
-              />
-              <TextField
-                placeholder="tags (comma separated)"
-                value={tagsInput}
-                onChange={(e) => setTagsInput(e.target.value)}
-                size="small"
-                sx={{ width: 220 }}
-                disabled={!selectedRoom}
-              />
-              <Button
-                variant="contained"
-                onClick={handleSend}
-                disabled={!selectedRoom || !text.trim()}
-              >
-                Send
-              </Button>
-            </Stack>
-          </Box>
+          <MessagesArea
+            selectedRoom={selectedRoom}
+            messages={messages}
+            currentUserId={user.id}
+          />
+          <MessageInput disabled={!selectedRoom} onSend={handleSendMessage} />
         </Box>
       </Paper>
+
+      <CreateRoomDialog
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        users={users}
+        currentUserId={user.id}
+        onCreate={handleCreateRoom}
+      />
     </Box>
   );
 }
