@@ -1,7 +1,6 @@
 package com.tech.api.controller;
 
 import com.tech.api.dto.*;
-import com.tech.api.entity.User;
 import com.tech.api.mapper.UserMapper;
 import com.tech.api.service.UserService;
 import lombok.RequiredArgsConstructor;
@@ -13,11 +12,17 @@ import java.util.List;
 @RequestMapping("/user")
 @RequiredArgsConstructor
 public class UserController {
+
     private final UserService userService;
 
     @PostMapping("/auth/login")
-    public LoginResponse login(@RequestBody LoginRequest request) {
+    public AuthResponse login(@RequestBody LoginRequest request) {
         return userService.login(request);
+    }
+
+    @PostMapping("/register")
+    public AuthResponse register(@RequestBody RegisterRequest request) {
+        return userService.register(request);
     }
 
     @GetMapping("/users")
@@ -29,6 +34,7 @@ public class UserController {
     public UserRespDTO post(@RequestBody UserDTO dto) {
         return UserMapper.toRespDTO(userService.createUser(dto));
     }
+
     @PutMapping("/{id}")
     public String put(@PathVariable String id) {
         return id;
@@ -42,10 +48,5 @@ public class UserController {
     @PostMapping("/logout")
     public void logout(@RequestParam String userId) {
         userService.logout(userId);
-    }
-
-    @PostMapping("/register")
-    public LoginResponse register(@RequestBody RegisterRequest request) {
-        return userService.register(request);
     }
 }
