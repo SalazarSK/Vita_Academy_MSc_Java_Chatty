@@ -37,7 +37,7 @@ public class DataInitializer {
 
             userRepository.saveAll(List.of(u1, u2, u3));
 
-            ChatRoom general = chatRoomService.createRoom("general");
+            ChatRoom general = chatRoomService.createTeamRoom("general", u1.getId(), List.of(u2.getId(), u3.getId()));
            
             Message m1 = createMessage(u1, general, "Hi Bob, how are you?");
             Message m2 = createMessage(u2, general, "Doing great, Alice!");
@@ -45,7 +45,7 @@ public class DataInitializer {
 
             messageRepository.saveAll(List.of(m1, m2, m3));
 
-            System.out.println("🔥 Initial demo data loaded.");
+            System.out.println("Initial demo data loaded.");
         };
     }
 
