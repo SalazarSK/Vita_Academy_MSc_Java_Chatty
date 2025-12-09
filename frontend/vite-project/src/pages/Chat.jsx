@@ -20,8 +20,8 @@ export default function Chat({ user, onLogout }) {
   const [selectedRoom, setSelectedRoom] = useState(null);
   const [messages, setMessages] = useState([]);
   const [users, setUsers] = useState([]);
-  const [stompClient, setStompClient] = useState(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [stompClient, setStompClient] = useState(null);
 
   const handleLogout = async () => {
     try {
@@ -33,6 +33,7 @@ export default function Chat({ user, onLogout }) {
     }
   };
 
+  // 1) načítanie userov a roomiek
   useEffect(() => {
     if (!user) return;
 
@@ -42,8 +43,10 @@ export default function Chat({ user, onLogout }) {
           getUsers(),
           getRooms(user.id),
         ]);
+
         setUsers(usersResp || []);
         setRooms(roomsResp || []);
+
         if (!selectedRoom && roomsResp && roomsResp.length > 0) {
           setSelectedRoom(roomsResp[0]);
         }
@@ -54,6 +57,7 @@ export default function Chat({ user, onLogout }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
+  // 2) pripojenie na WebSocket
   useEffect(() => {
     if (!user) return;
 
@@ -63,9 +67,11 @@ export default function Chat({ user, onLogout }) {
 
     return () => {
       disconnectWebSocket(client);
+      setStompClient(null);
     };
   }, [user?.id]);
 
+  // 3) subscribe na vybranú roomku
   useEffect(() => {
     if (!stompClient || !selectedRoom) return;
 
@@ -77,9 +83,12 @@ export default function Chat({ user, onLogout }) {
       }
     );
 
-    return () => sub.unsubscribe();
+    return () => {
+      sub.unsubscribe();
+    };
   }, [stompClient, selectedRoom?.id]);
 
+  // 4) načítanie histórie pri zmene roomky
   useEffect(() => {
     if (!user || !selectedRoom) return;
 
@@ -115,41 +124,52 @@ export default function Chat({ user, onLogout }) {
       });
       setRooms((prev) => [...prev, room]);
       setSelectedRoom(room);
+      setMessages([]);
       setCreateOpen(false);
     } catch (e) {
       console.error("Failed to create room", e);
     }
   };
 
+  // direct chat = len špeciálna roomka
   const handleStartDirectChat = async (u) => {
     try {
       const room = await getOrCreatePrivateRoom(user.id, u.id || u.uid);
+
       setRooms((prev) => {
         const exists = prev.some((r) => r.id === room.id);
         return exists ? prev : [...prev, room];
       });
+
       setSelectedRoom(room);
+      setMessages([]);
     } catch (e) {
       console.error("Failed to start direct chat", e);
     }
   };
 
+  // 5) posielanie správ – WS + fallback na REST
   const handleSendMessage = async (text, tags) => {
     if (!selectedRoom) return;
 
+    const trimmed = text.trim();
+    if (!trimmed) return;
+
     const payload = {
-      fromUserId: user.id,
-      content: text.trim(),
+      fromUserId: String(user.id),
+      roomId: selectedRoom.id,
+      content: trimmed,
       tags,
     };
 
     try {
       if (stompClient) {
         stompClient.publish({
-          destination: `/app/rooms/${selectedRoom.id}/send`,
+          destination: "/app/chat.send",
           body: JSON.stringify(payload),
         });
       } else {
+        // fallback
         await sendMessageToRoom(selectedRoom.id, payload);
         const data = await getMessagesForRoom(selectedRoom.id, user.id);
         setMessages(data || []);
@@ -199,6 +219,7 @@ export default function Chat({ user, onLogout }) {
             selectedRoom={selectedRoom}
             messages={messages}
             currentUserId={user.id}
+            currentUsername={user.username}
           />
           <MessageInput disabled={!selectedRoom} onSend={handleSendMessage} />
         </Box>

@@ -115,9 +115,11 @@ export const getMessagesForRoom = async (roomId, userId, tag) => {
 };
 
 // POST /rooms/{roomId}/messages
-// payload: { fromUserId, content, tags: string[] }
+// payload: { fromUserId, roomId, content, tags: string[] }
 export const sendMessageToRoom = async (roomId, msg) => {
-  const res = await client.post(`/rooms/${roomId}/messages`, msg);
+  const payload = { ...msg, roomId };
+  const res = await client.post(`/rooms/${roomId}/messages`, payload);
+  console.log(res);
   return res.data;
 };
 
