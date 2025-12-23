@@ -5,9 +5,12 @@ import com.tech.api.dto.SendMessageRequest;
 import com.tech.api.entity.ChatRoom;
 import com.tech.api.entity.Message;
 import com.tech.api.entity.Tag;
+import com.tech.api.entity.Topic;
 import com.tech.api.entity.User;
+import com.tech.api.enums.TopicStatus;
 import com.tech.api.mapper.ChatMapper;
 import com.tech.api.repository.MessageRepository;
+import com.tech.api.repository.TopicRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -22,13 +25,14 @@ public class MessageService {
     private final UserService userService;
     private final ChatRoomService chatRoomService;
     private final TagService tagService;
+    private final TopicRepository topicRepository;
     private final ChatMapper mapper;
 
     public List<MessageDto> getMessagesForRoom(String roomId, String userId) {
         userService.touch(userId);
 
         return messageRepository
-                .findByRoomIdOrderBySentAtAsc(roomId)
+                .findByRoom_IdAndTopicIsNullOrderBySentAtAsc(roomId)
                 .stream()
                 .map(mapper::toMessageDto)
                 .toList();
@@ -38,7 +42,24 @@ public class MessageService {
         userService.touch(userId);
 
         return messageRepository
-                .findByRoomIdAndTagsNameOrderBySentAtAsc(roomId, tagName)
+                .findByRoom_IdAndTopicIsNullAndTags_NameOrderBySentAtAsc(roomId, tagName)
+                .stream()
+                .map(mapper::toMessageDto)
+                .toList();
+    }
+
+    public List<MessageDto> getMessagesForRoomByTopic(String roomId, String topicId, String userId) {
+        userService.touch(userId);
+
+        Topic t = topicRepository.findById(topicId)
+                .orElseThrow(() -> new RuntimeException("Topic not found"));
+
+        if (!t.getRoom().getId().equals(roomId)) {
+            throw new RuntimeException("Topic room mismatch");
+        }
+
+        return messageRepository
+                .findByRoom_IdAndTopic_IdOrderBySentAtAsc(roomId, topicId)
                 .stream()
                 .map(mapper::toMessageDto)
                 .toList();
@@ -54,6 +75,19 @@ public class MessageService {
         m.setRoom(room);
         m.setContent(request.content());
         m.setTags(tags);
+
+        if (request.topicId() != null && !request.topicId().isBlank()) {
+            Topic t = topicRepository.findById(request.topicId())
+                    .orElseThrow(() -> new RuntimeException("Topic not found"));
+
+            if (!t.getRoom().getId().equals(room.getId())) {
+                throw new RuntimeException("Topic room mismatch");
+            }
+            if (t.getStatus() == TopicStatus.CLOSED) {
+                throw new RuntimeException("Topic is closed");
+            }
+            m.setTopic(t);
+        }
 
         userService.touch(from.getId());
 

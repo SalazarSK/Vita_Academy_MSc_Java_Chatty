@@ -1,4 +1,9 @@
 package com.tech.api.dto;
 
-public class IssueDraft {
-}
+import java.util.List;
+
+public record IssueDraft(
+        String title,
+        String body,
+        List<String> labels
+) {}

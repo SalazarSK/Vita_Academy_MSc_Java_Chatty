@@ -1,4 +1,6 @@
 package com.tech.api.enums;
 
-public class TopicStatus {
+public enum TopicStatus {
+    OPEN,
+    CLOSED
 }

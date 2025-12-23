@@ -36,7 +36,8 @@ public class ChatMapper {
                 m.getRoom().getId(),
                 m.getContent(),
                 m.getSentAt(),
-                tagNames
+                tagNames,
+                m.getTopic() != null ? m.getTopic().getId() : null
         );
     }
 

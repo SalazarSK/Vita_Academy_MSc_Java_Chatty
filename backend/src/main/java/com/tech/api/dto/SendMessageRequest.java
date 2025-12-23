@@ -6,5 +6,6 @@ public record SendMessageRequest(
         String roomId,
         String fromUserId,
         String content,
-        List<String> tags
+        List<String> tags,
+        String topicId
 ) {}

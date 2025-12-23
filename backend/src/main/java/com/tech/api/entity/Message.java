@@ -34,7 +34,12 @@ public class Message {
             joinColumns = @JoinColumn(name = "message_id"),
             inverseJoinColumns = @JoinColumn(name = "tag_id")
     )
+
     private Set<Tag> tags = new HashSet<>();
+
+    @ManyToOne
+    @JoinColumn(name = "topic_id")
+    private Topic topic;
 
     private ZonedDateTime sentAt = ZonedDateTime.now();
 }
