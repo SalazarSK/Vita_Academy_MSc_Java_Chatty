@@ -19,8 +19,12 @@ public class MessageController {
     public List<MessageDto> getMessages(
             @PathVariable String roomId,
             @RequestParam String userId,
-            @RequestParam(required = false) String tag
+            @RequestParam(required = false) String tag,
+            @RequestParam(required = false) String topicId
     ) {
+        if (topicId != null && !topicId.isBlank()) {
+            return messageService.getMessagesForRoomByTopic(roomId, topicId, userId);
+        }
         if (tag != null && !tag.isBlank()) {
             return messageService.getMessagesForRoomByTag(roomId, tag, userId);
         }
@@ -36,9 +40,9 @@ public class MessageController {
                 roomId,
                 request.fromUserId(),
                 request.content(),
-                request.tags()
+                request.tags(),
+                request.topicId()
         );
-
         return messageService.sendMessage(fixed);
     }
 }

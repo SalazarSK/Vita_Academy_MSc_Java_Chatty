@@ -9,8 +9,8 @@ public record MessageDto(
         String toUserId,
         String content,
         ZonedDateTime sentAt,
-        Set<String> tags
-
+        Set<String> tags,
+        String topicId
 ) {}
 
 
