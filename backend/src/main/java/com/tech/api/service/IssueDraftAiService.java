@@ -188,7 +188,7 @@ public class IssueDraftAiService {
         String hExpected = en ? "### Expected" : "### Očakávané správanie";
         String hSteps = en ? "### Steps to reproduce" : "### Kroky na reprodukciu";
         String hEvidence = en ? "### Evidence (top messages)" : "### Dôkazy (najrelevantnejšie správy)";
-        String hTodo = en ? "### TODO" : "### TODO";
+        String hTodo = "### TODO";
 
         StringBuilder sb = new StringBuilder();
         sb.append(hSummary).append("\n").append(summary).append("\n\n");

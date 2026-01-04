@@ -137,6 +137,30 @@ public class TopicService {
         messageRepository.save(m);
     }
 
+    @Transactional
+    public TopicResponse updateStatus(String roomId, String topicId, String currentUserId, String statusRaw) {
+        Topic t = topicRepository.findById(topicId)
+                .orElseThrow(() -> new RuntimeException("Topic not found"));
+
+        if (!t.getRoom().getId().equals(roomId)) {
+            throw new RuntimeException("Topic room mismatch");
+        }
+
+        TopicStatus st = TopicStatus.valueOf(statusRaw.trim().toUpperCase());
+
+        if (st == TopicStatus.CLOSED) {
+            t.setStatus(TopicStatus.CLOSED);
+            t.setClosedAt(ZonedDateTime.now());
+        } else {
+            t.setStatus(TopicStatus.OPEN);
+            t.setClosedAt(null);
+        }
+
+        Topic saved = topicRepository.save(t);
+        return toResp(saved);
+    }
+
+
     private TopicResponse toResp(Topic t) {
         var msgs = messageRepository.findByRoom_IdAndTopic_IdOrderBySentAtAsc(
                 t.getRoom().getId(),

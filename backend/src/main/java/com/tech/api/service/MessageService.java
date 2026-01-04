@@ -70,23 +70,28 @@ public class MessageService {
         ChatRoom room = chatRoomService.getById(request.roomId());
         Set<Tag> tags = tagService.resolveTags(request.tags());
 
+        // topic (optional) – načítaj + validuj len raz
+        Topic topic = null;
+        if (request.topicId() != null && !request.topicId().isBlank()) {
+            topic = topicRepository.findById(request.topicId())
+                    .orElseThrow(() -> new RuntimeException("Topic not found"));
+
+            if (!topic.getRoom().getId().equals(room.getId())) {
+                throw new RuntimeException("Topic room mismatch");
+            }
+            if (topic.getStatus() == TopicStatus.CLOSED) {
+                throw new RuntimeException("Topic is closed");
+            }
+        }
+
         Message m = new Message();
         m.setFrom(from);
         m.setRoom(room);
         m.setContent(request.content());
         m.setTags(tags);
 
-        if (request.topicId() != null && !request.topicId().isBlank()) {
-            Topic t = topicRepository.findById(request.topicId())
-                    .orElseThrow(() -> new RuntimeException("Topic not found"));
-
-            if (!t.getRoom().getId().equals(room.getId())) {
-                throw new RuntimeException("Topic room mismatch");
-            }
-            if (t.getStatus() == TopicStatus.CLOSED) {
-                throw new RuntimeException("Topic is closed");
-            }
-            m.setTopic(t);
+        if (topic != null) {
+            m.setTopic(topic);
         }
 
         userService.touch(from.getId());
@@ -94,4 +99,11 @@ public class MessageService {
         Message saved = messageRepository.save(m);
         return mapper.toMessageDto(saved);
     }
+
+    public List<MessageDto> searchMessagesInRoom(String roomId, String q, String userId) {
+        return messageRepository
+                .findByRoom_IdAndContentContainingIgnoreCaseOrderBySentAtAsc(roomId, q.trim())
+                .stream().map(mapper::toMessageDto).toList();
+    }
+
 }

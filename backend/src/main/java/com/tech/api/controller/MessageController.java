@@ -20,7 +20,8 @@ public class MessageController {
             @PathVariable String roomId,
             @RequestParam String userId,
             @RequestParam(required = false) String tag,
-            @RequestParam(required = false) String topicId
+            @RequestParam(required = false) String topicId,
+            @RequestParam(required = false) String q
     ) {
         if (topicId != null && !topicId.isBlank()) {
             return messageService.getMessagesForRoomByTopic(roomId, topicId, userId);
@@ -28,8 +29,12 @@ public class MessageController {
         if (tag != null && !tag.isBlank()) {
             return messageService.getMessagesForRoomByTag(roomId, tag, userId);
         }
+        if (q != null && !q.isBlank()) {
+            return messageService.searchMessagesInRoom(roomId, q, userId);
+        }
         return messageService.getMessagesForRoom(roomId, userId);
     }
+
 
     @PostMapping("/{roomId}/messages")
     public MessageDto send(

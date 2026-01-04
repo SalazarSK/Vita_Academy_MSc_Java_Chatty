@@ -18,7 +18,7 @@ public class DraftExportService {
     private final MessageRepository messageRepository;
     private final IssueDraftAiService issueDraftAiService;
 
-    public IssueDraft generateDraft(String topicId) {
+    public IssueDraft generateDraft(String roomId, String topicId) {
         Topic topic = topicRepository.findById(topicId)
                 .orElseThrow(() -> new RuntimeException("Topic not found"));
 
