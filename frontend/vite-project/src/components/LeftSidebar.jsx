@@ -21,7 +21,10 @@ export default function LeftSidebar({
   onOpenCreateRoom,
   onLogout,
 }) {
-  const visibleRooms = rooms.filter((r) => !r.direct);
+  const visibleRooms = (rooms || []).filter((r) => !r.direct);
+
+  const myId = user?.uid ?? user?.id;
+  const getUserId = (u) => u?.uid ?? u?.id;
 
   const getInitials = (u) => {
     if (!u) return "?";
@@ -50,7 +53,6 @@ export default function LeftSidebar({
       >
         <Stack direction="row" spacing={1.2} alignItems="center">
           <GroupsIcon fontSize="small" />
-
           <Box>
             <Typography
               variant="body2"
@@ -59,7 +61,6 @@ export default function LeftSidebar({
             >
               {room.name}
             </Typography>
-
             <Typography
               variant="caption"
               color="text.secondary"
@@ -75,11 +76,20 @@ export default function LeftSidebar({
 
   const renderUserItem = (u) => {
     const isOnline = u.online ?? false;
+    const uid = getUserId(u);
+
+    const handleClick = () => {
+      if (!uid) {
+        console.error("User has no id/uid - cannot start direct chat", u);
+        return;
+      }
+      onStartDirectChat(u);
+    };
 
     return (
       <Box
-        key={u.id}
-        onClick={() => onStartDirectChat(u)}
+        key={uid} // ✅ stabilný key
+        onClick={handleClick}
         sx={{
           px: 1.5,
           py: 0.8,
@@ -105,7 +115,9 @@ export default function LeftSidebar({
 
         <Box sx={{ flex: 1 }}>
           <Typography variant="body2" fontWeight={500}>
-            {u.firstName} {u.lastName}
+            {u.firstName || u.lastName
+              ? `${u.firstName || ""} ${u.lastName || ""}`.trim()
+              : u.username}
           </Typography>
 
           <Stack direction="row" spacing={0.6} alignItems="center">
@@ -136,7 +148,6 @@ export default function LeftSidebar({
         flexDirection: "column",
       }}
     >
-      {/* Header */}
       <Box sx={{ px: 2, pt: 2, pb: 1.5 }}>
         <Typography variant="h6" fontWeight={700}>
           Rooms
@@ -151,9 +162,7 @@ export default function LeftSidebar({
 
       <Divider />
 
-      {/* Scrollable List */}
       <Box sx={{ flex: 1, overflowY: "auto", px: 2, py: 1.5 }}>
-        {/* ROOMS */}
         <Stack
           direction="row"
           alignItems="center"
@@ -173,7 +182,6 @@ export default function LeftSidebar({
 
         <Divider sx={{ my: 2 }} />
 
-        {/* USERS */}
         <Typography
           variant="overline"
           color="text.secondary"
@@ -182,12 +190,14 @@ export default function LeftSidebar({
           USERS
         </Typography>
 
-        {users
-          .filter((u) => u.id !== user.id && u.uid !== user.id)
+        {(users || [])
+          .filter((u) => {
+            const uid = getUserId(u);
+            return uid && uid !== myId;
+          })
           .map(renderUserItem)}
       </Box>
 
-      {/* Footer buttons */}
       <Box
         sx={{
           px: 2,
@@ -200,21 +210,14 @@ export default function LeftSidebar({
         <Button
           variant="outlined"
           onClick={onOpenCreateRoom}
-          sx={{
-            borderRadius: 20,
-            textTransform: "none",
-            fontSize: 13,
-          }}
+          sx={{ borderRadius: 20, textTransform: "none", fontSize: 13 }}
         >
           New Room
         </Button>
 
         <IconButton
           onClick={onLogout}
-          sx={{
-            borderRadius: 2,
-            border: "1px solid #E5E7EB",
-          }}
+          sx={{ borderRadius: 2, border: "1px solid #E5E7EB" }}
         >
           <LogoutIcon fontSize="small" />
         </IconButton>

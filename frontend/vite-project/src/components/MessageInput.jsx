@@ -19,13 +19,7 @@ export default function MessageInput({ disabled, onSend }) {
   };
 
   return (
-    <Box
-      sx={{
-        p: 1.5,
-        borderTop: "1px solid #e5e7eb",
-        bgcolor: "#f9fafb",
-      }}
-    >
+    <Box sx={{ p: 1.5, borderTop: "1px solid #e5e7eb", bgcolor: "#f9fafb" }}>
       <Box
         sx={{
           borderRadius: 999,
@@ -44,10 +38,15 @@ export default function MessageInput({ disabled, onSend }) {
             size="small"
             variant="standard"
             disabled={disabled}
-            InputProps={{
-              disableUnderline: true,
+            InputProps={{ disableUnderline: true }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                handleSendClick();
+              }
             }}
           />
+
           <TextField
             placeholder="tags (comma separated)"
             value={tagsInput}
@@ -56,19 +55,14 @@ export default function MessageInput({ disabled, onSend }) {
             variant="standard"
             sx={{ width: 220 }}
             disabled={disabled}
-            InputProps={{
-              disableUnderline: true,
-            }}
+            InputProps={{ disableUnderline: true }}
           />
+
           <Button
             variant="contained"
             onClick={handleSendClick}
             disabled={disabled || !text.trim()}
-            sx={{
-              borderRadius: 999,
-              textTransform: "none",
-              px: 2.5,
-            }}
+            sx={{ borderRadius: 999, textTransform: "none", px: 2.5 }}
           >
             Send
           </Button>

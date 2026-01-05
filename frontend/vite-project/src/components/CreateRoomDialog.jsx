@@ -34,7 +34,6 @@ export default function CreateRoomDialog({
 
   const handleMembersChange = (event) => {
     const { value } = event.target;
-    // MUI multiple select: value môže byť string alebo array
     setRoomMembers(typeof value === "string" ? value.split(",") : value);
   };
 
@@ -44,7 +43,6 @@ export default function CreateRoomDialog({
       <DialogContent sx={{ mt: 1 }}>
         <Stack spacing={2} padding={2}>
           <TextField
-            id="outlined-basic"
             variant="outlined"
             label="Room name"
             fullWidth
@@ -61,20 +59,26 @@ export default function CreateRoomDialog({
             SelectProps={{
               multiple: true,
               renderValue: (selectedIds) => {
-                const selectedUsers = users.filter((u) =>
-                  selectedIds.includes(u.uid)
+                const selectedUsers = (users || []).filter((u) =>
+                  selectedIds.includes(u.id)
                 );
                 return selectedUsers
-                  .map((u) => `${u.firstName} ${u.lastName}`)
+                  .map(
+                    (u) =>
+                      `${u.firstName || ""} ${u.lastName || ""}`.trim() ||
+                      u.username
+                  )
                   .join(", ");
               },
             }}
           >
-            {users
-              .filter((u) => u.uid !== currentUserId && u.uid !== currentUserId)
+            {(users || [])
+              .filter((u) => u.id !== currentUserId)
               .map((u) => (
-                <MenuItem key={u.uid} value={u.uid}>
-                  {u.firstName} {u.lastName}
+                <MenuItem key={u.uid} value={u.id}>
+                  {u.firstName || u.lastName
+                    ? `${u.firstName || ""} ${u.lastName || ""}`.trim()
+                    : u.username}
                   {u.username ? ` (${u.username})` : ""}
                 </MenuItem>
               ))}

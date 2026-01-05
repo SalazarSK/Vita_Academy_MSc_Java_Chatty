@@ -1,9 +1,7 @@
 package com.tech.api.controller;
 
-import com.tech.api.dto.AssignMessagesRequest;
-import com.tech.api.dto.CreateTopicRequest;
-import com.tech.api.dto.IssueDraft;
-import com.tech.api.dto.TopicResponse;
+import com.tech.api.dto.*;
+import com.tech.api.repository.UserRepository;
 import com.tech.api.service.DraftExportService;
 import com.tech.api.service.TopicService;
 import jakarta.validation.Valid;
@@ -13,17 +11,26 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/topic")
 @RequiredArgsConstructor
 public class TopicController {
 
     private final TopicService topicService;
     private final DraftExportService draftExportService;
+    private final UserRepository userRepository;
 
-    // TODO: napojit na auth (napr. z JWT)
     private String currentUserId() {
-        // return SecurityContextHolder.getContext().getAuthentication()...
-        return "TODO_CURRENT_USER_ID";
+        var auth = org.springframework.security.core.context.SecurityContextHolder
+                .getContext()
+                .getAuthentication();
+
+        if (auth == null || !auth.isAuthenticated()) {
+            throw new RuntimeException("Unauthenticated");
+        }
+
+        String username = auth.getName(); // ✅ z JWT (subject / username)
+        return userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found"))
+                .getId();
     }
 
     @PostMapping("/rooms/{roomId}/topics")
@@ -61,11 +68,21 @@ public class TopicController {
         topicService.unassignMessage(messageId);
     }
 
-    @PostMapping("/{roomId}/topics/{topicId}/export/draft")
+    @PostMapping("/rooms/{roomId}/topics/{topicId}/export/draft")
     public IssueDraft exportDraft(
             @PathVariable String roomId,
             @PathVariable String topicId
     ) {
-        return draftExportService.generateDraft(topicId);
+        return draftExportService.generateDraft(roomId, topicId);
     }
+
+    @PatchMapping("/rooms/{roomId}/topics/{topicId}/status")
+    public TopicResponse updateStatus(
+            @PathVariable String roomId,
+            @PathVariable String topicId,
+            @Valid @RequestBody UpdateTopicStatusRequest req
+    ) {
+        return topicService.updateStatus(roomId, topicId, currentUserId(), req.getStatus());
+    }
+
 }
