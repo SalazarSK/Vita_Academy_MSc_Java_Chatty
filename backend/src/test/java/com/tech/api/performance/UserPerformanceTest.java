@@ -3,9 +3,11 @@ package com.tech.api.performance;
 import com.tech.api.configuration.SecurityConfig;
 import com.tech.api.controller.UserController;
 import com.tech.api.dto.UserRespDTO;
+import com.tech.api.security.JwtService;
 import com.tech.api.service.UserService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
@@ -20,11 +22,12 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(UserController.class)
-@Import(SecurityConfig.class)
+@AutoConfigureMockMvc(addFilters = false)
 class UserPerformanceTest {
 
     @Autowired
     private MockMvc mockMvc;
+    @MockBean JwtService jwtService;
 
     @MockBean
     private UserService userService;
