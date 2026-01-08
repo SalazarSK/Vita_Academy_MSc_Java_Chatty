@@ -5,9 +5,11 @@ import com.tech.api.configuration.SecurityConfig;
 import com.tech.api.controller.MessageController;
 import com.tech.api.dto.MessageDto;
 import com.tech.api.dto.SendMessageRequest;
+import com.tech.api.security.JwtService;
 import com.tech.api.service.MessageService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
@@ -16,6 +18,7 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.ZonedDateTime;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -24,17 +27,14 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(MessageController.class)
-@Import(SecurityConfig.class)
+@AutoConfigureMockMvc(addFilters = false)
 class MessagePerformanceTest {
 
-    @Autowired
-    private MockMvc mockMvc;
+    @Autowired private MockMvc mockMvc;
+    @Autowired private ObjectMapper objectMapper;
+    @MockBean JwtService jwtService;
 
-    @Autowired
-    private ObjectMapper objectMapper;
-
-    @MockBean
-    private MessageService messageService;
+    @MockBean private MessageService messageService;
 
     @Test
     @WithMockUser(username = "perf-tester")
@@ -47,22 +47,28 @@ class MessagePerformanceTest {
                     return new MessageDto(
                             "msg-id",
                             req.fromUserId(),
-                            req.toUserId(),
+                            req.roomId(),
                             req.content(),
-                            ZonedDateTime.now()
+                            ZonedDateTime.now(),
+                            req.tags() == null ? Set.of() : Set.copyOf(req.tags()),
+                            req.topicId()
                     );
                 });
 
         long start = System.currentTimeMillis();
 
         for (int i = 0; i < count; i++) {
+            String roomId = "room-1";
+
             SendMessageRequest req = new SendMessageRequest(
+                    roomId,
                     "alice-id",
-                    "bob-id",
-                    "perf-msg-" + i
+                    "perf-msg-" + i,
+                    null,
+                    null
             );
 
-            mockMvc.perform(post("/messages")
+            mockMvc.perform(post("/rooms/{roomId}/messages", roomId)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(req)))
                     .andExpect(status().isOk());
